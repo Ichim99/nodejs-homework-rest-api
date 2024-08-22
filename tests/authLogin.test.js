@@ -1,31 +1,43 @@
 
 import mongoose from 'mongoose';
-import request from "supertest";
 import app from "../app.js";
-import dotenv from "dotenv";
+import request from "supertest";
+import { User } from '../models/user.js';
 
-dotenv.config();
+const { TEST_DB_HOST, PORT = 3000} = process.env;
 
-/* Connecting to the database before each test. */
-beforeEach(async () => {
-  await mongoose.connect(process.env.DB_HOST);
-});
+describe('test register route', () => {
+    let server = null;
 
-/* Closing database connection after each test. */
-afterEach(async () => {
-  await mongoose.connection.close();
-});
-
-describe("POST /api/users/login", () => {
-  it("should login a user", async () => {
-    const res = await request(app).post("/api/users/login").send({
-"password": "12345",
-"email": "test@exemple.com"
-});
-    expect(res.statusCode).toBe(200);
-    expect(res.body.user).toBe({
-        "email": "test@exemple.com",
-        "subscription": "starter"
+    beforeAll(async () => {
+        await mongoose.connect(TEST_DB_HOST);
+        server = app.listen(PORT);
     });
-  });
+
+    afterAll(async () => {
+        await mongoose.connection.close();
+        server.close();
+    });
+
+    afterEach(async () => {
+        await User.deleteMany({});
+    });
+
+    test("test register with correct data", async () => {
+        const registerData = {
+            "password": "12345",
+            "email": "test@exemple.com"
+        };
+        const res = await request(app).post("/api/users/register").send(registerData);
+        console.log(res.body);
+        expect(res.statusCode).toBe(201);
+        expect(res.body.user.subscription).toBe('starter');
+        expect(res.body.user.email).toBe(registerData.email);
+
+        const user = await User.findOne({ email: registerData.email });
+        expect(user.subscription).toBe('starter')
+    });   
 });
+
+
+
